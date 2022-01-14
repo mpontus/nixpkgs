@@ -162,44 +162,60 @@ users.extraGroups.vboxusers.members = ["mpontus"];
 
 * Packages
 
-#+begin_src nix
-nix.package = pkgs.nix_2_4;
+#+begin_src nix :noweb-ref system-configuration
+nix.package = pkgs.nixUnstable; # or versioned attributes like nix_2_4
 #+end_src
 
-** CLI
+** Home Manager
 
-Console / terminal / headless packages
+Load home-amanger module
 
-#+begin_src nix :noweb-ref home-packages
-ag
-ripgrep
-htop
-awscli2
-cmake
-fd
-file
-git
-gnupg
-hub
-imagemagick
-jq
-ledger
-libtool
-ncdu
-nodejs
-pass
-pkgs.nodePackages.node2nix
-ripgrep
-tree
-tree
-unzip
-wmctrl
-xclip
-xdotool
-yarn
+#+begin_src nix :noweb-ref import-files
+<home-manager/nixos>
 #+end_src
 
-** Desktop
+Configure home environment
+
+#+begin_src nix :noweb-ref system-configuration
+home-manager.users.mpontus = { pkgs, ... }: {
+  imports = [
+    <<home-import-files>>
+  ];
+  home.packages = with pkgs; [
+    <<home-packages>>
+  ];
+  <<home-configuration>>
+};
+#+end_src
+
+*** NUR
+
+Enable custom user repositories
+
+#+begin_src nix :noweb-ref home-configuration
+nixpkgs.config.packageOverrides = pkgs: {
+  nur = import (builtins.fetchTarball "https://github.com/nix-community/NUR/archive/master.tar.gz") {
+    inherit pkgs;
+  };
+};
+#+end_src
+
+** Flakes
+#+begin_src nix :noweb-ref system-configuration
+nix = {
+  extraOptions = ''
+    experimental-features = nix-command flakes
+  '';
+};
+#+end_src
+
+* Desktop
+
+#+begin_src nix :noweb-ref system-configuration
+services.xserver.enable = true;
+#+end_src
+
+** Packages
 
 GUI applications for window environment
 
@@ -240,57 +256,6 @@ nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (pkgs.lib.getName pkg) 
 ];
 #+end_src
 
-** Home Manager
-
-Load home-amanger module
-
-#+begin_src nix :noweb-ref import-files
-<home-manager/nixos>
-#+end_src
-
-Configure home environment
-
-#+begin_src nix
-home-manager.users.mpontus = { pkgs, ... }: {
-  imports = [
-    <<home-import-files>>
-  ];
-  home.packages = with pkgs; [
-    <<home-packages>>
-  ];
-  <<home-configuration>>
-};
-#+end_src
-
-*** NUR
-
-Enable custom user repositories
-
-#+begin_src nix :noweb-ref home-configuration
-nixpkgs.config.packageOverrides = pkgs: {
-  nur = import (builtins.fetchTarball "https://github.com/nix-community/NUR/archive/master.tar.gz") {
-    inherit pkgs;
-  };
-};
-#+end_src
-
-** COMMENT Flakes
-
-#+begin_src nix
-nix = {
-  package = pkgs.nixUnstable; # or versioned attributes like nix_2_4
-  extraOptions = ''
-    experimental-features = nix-command flakes
-  '';
-};
-#+end_src
-
-* Desktop
-
-#+begin_src nix :noweb-ref system-configuration
-services.xserver.enable = true;
-#+end_src
-
 ** Gnome
 
 Enable the GNOME Desktop Environment
@@ -309,7 +274,7 @@ services.xserver.displayManager.autoLogin.enable = true;
 services.xserver.displayManager.autoLogin.user = "mpontus";
 #+end_src
 
-*** dconf-editor
+*** DConf
 
 #+begin_src nix :noweb-ref home-packages
 gnome.dconf-editor
@@ -335,7 +300,7 @@ dconf.settings = {
 );
 #+end_src
 
-**** Disable warning when opening dconf-editor
+**** Disable warning message when opening GUI
 
 #+begin_src nix :noweb-ref dconf-settings
 "ca/desrt/dconf-editor" = { show-warning = false; };
@@ -402,33 +367,31 @@ dconf.settings = {
 };
 #+end_src
 
-** COMMENT XMonad
+** XMonad
 
 #+begin_src nix :noweb-ref system-configuration
 services.xserver.windowManager.xmonad.enable = true;
 #+end_src
 
-** Emacs
-
-*** COMMENT Install using home-manager
-
-#+begin_src nix :noweb-ref home-packages
-(let emacsPackages = pkgs.emacsPackagesFor pkgs.emacs;
- in emacsPackages.emacsWithPackages (epkgs: [epkgs.vterm]))
-#+end_src
-
-*** Install from nixpkgs
+** Emacs (system)
 
 #+begin_src nix :noweb-ref system-configuration
 services.emacs.enable = true;
 #+end_src
 
-**** vterm
+*** vterm
 
 #+begin_src nix :noweb-ref system-configuration
 services.emacs.package =
   let emacsPackages = pkgs.emacsPackagesFor pkgs.emacs;
   in emacsPackages.emacsWithPackages (epkgs: [epkgs.vterm]);
+#+end_src
+
+** COMMENT Emacs
+
+#+begin_src nix :noweb-ref home-packages
+(let emacsPackages = pkgs.emacsPackagesFor pkgs.emacs;
+ in emacsPackages.emacsWithPackages (epkgs: [epkgs.vterm]))
 #+end_src
 
 ** Firefox (system)
@@ -476,6 +439,14 @@ home.sessionVariables = {
 };
 #+end_src
 
+** X11 utils
+
+#+begin_src nix :noweb-ref home-packages
+xclip
+xdotool
+xorg.xprop
+xorg.xwininfo
+#+end_src
 
 ** Fonts
 
@@ -500,7 +471,40 @@ fonts = {
 #+end_src
 * Terminal
 
-** COMMENT fish
+** Packages
+
+Console / terminal / headless packages
+
+#+begin_src nix :noweb-ref home-packages
+ag
+ripgrep
+htop
+awscli2
+cmake
+fd
+file
+git
+gnupg
+hub
+imagemagick
+jq
+ledger
+libtool
+ncdu
+nodejs
+pass
+pkgs.nodePackages.node2nix
+ripgrep
+tree
+tree
+unzip
+wmctrl
+xclip
+xdotool
+yarn
+#+end_src
+
+** fish
 
 
 #+begin_src nix :noweb-ref home-configuration
