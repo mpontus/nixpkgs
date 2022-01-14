@@ -200,7 +200,7 @@ Enable custom user repositories
   };
 #+end_src
 
-** Flakes
+** COMMENT Flakes
 #+begin_src nix :noweb-ref system-configuration
   nix = {
     extraOptions = ''
@@ -209,13 +209,23 @@ Enable custom user repositories
   };
 #+end_src
 
+** Custom packages
+#+begin_src nix :noweb-ref home-packages
+(callPackage ./pkgs/bluejeans { })
+(callPackage ./pkgs/marvin.nix { })
+(callPackage ./pkgs/stremio.nix { })
+(callPackage ./pkgs/toptracker { })
+(callPackage ./pkgs/roamresearch { })
+(callPackage ./pkgs/pageres { })
+#+end_src
+
 ** Unfree
 
 Need to enable some unfree packages
 
 #+begin_src nix :noweb-ref home-configuration
   nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (pkgs.lib.getName pkg) [
-    <<unfree-packages>>
+    "bluejeans" <<unfree-packages>>
   ];
 #+end_src
 
@@ -232,15 +242,16 @@ Need to enable some unfree packages
 GUI applications for window environment
 
 #+begin_src nix :noweb-ref home-packages
-  tilda tridactyl-native chromium deluge pavucontrol tdesktop #
-    tor-browser-bundle-bin slack vscode obsidian discord vlc
+  tilda tridactyl-native chromium deluge pavucontrol tdesktop
+    # tor-browser-bundle-bin
+    slack vscode obsidian discord vlc
     pkgs.gnome.gnome-tweaks obs-studio element-desktop postman
 #+end_src
 
 Need to whitelist some unfree packages.
 
 #+begin_src nix :noweb-ref unfree-packages
-  "slack" "vscode" "discord" "obsidian"
+  "slack" "vscode" "discord" "obsidian" "postman"
 #+end_src
 
 ** Gnome
