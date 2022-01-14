@@ -56,12 +56,6 @@ time.timeZone = "Europe/Moscow";
 
 ** Users
 
-*** COMMENT Immutable users
-
-#+begin_src nix
-users.mutableUsers = false;
-#+end_src
-
 *** Root password
 
 Don't forget to reset a password with ‘passwd’
@@ -88,12 +82,6 @@ environment.homeBinInPath = true;
 
 ** Networking
 
-*** COMMENT Wireless
-
-#+begin_src nix
-networking.wireless.enable = true;
-#+end_src
-
 *** DHCP
 
 #+begin_src nix
@@ -114,14 +102,6 @@ Disabled
 networking.firewall.enable = false;
 #+end_src
 
-*** COMMENT Spoof default TTL
-
-#+begin_src nix
-boot.kernel.sysctl = {
-  "net.ipv4.ip_default_ttl" = 65;
-};
-
-#+end_src
 ** Sound
 
 #+begin_src nix
@@ -153,8 +133,6 @@ hardware.bluetooth = {
 *** COMMENT Blueman
 
 #+begin_src nix
-
-# environment.systemPackages = [ pkgs.blueman ];
 services.blueman.enable = true;
 #+end_src
 
@@ -166,26 +144,100 @@ pkgs.virt-manager
 #+end_src
 
 #+begin_src nix
-virtualisation.libvirtd.enable= true;
 boot.kernelModules = ["kvm-intel" "kvm-amd"];
+virtualisation.libvirtd.enable = true;
 #+end_src
+
 *** COMMENT Virtualbox
 
-#+begin_src nix
-nixpkgs.config.allowUnfree = true;
+#+begin_src nix :noweb-ref nonfree-packages
+  "Oracle_VM_VirtualBox_Extension_Pack"
+#+end_src
+
+#+begin_src nix :noweb-ref system-configuration
 virtualisation.virtualbox.host.enable = true;
 virtualisation.virtualbox.host.enableExtensionPack = true;
 users.extraGroups.vboxusers.members = ["mpontus"];
 #+end_src
-** Flakes
+
+* Packages
 
 #+begin_src nix
-nix = {
-  package = pkgs.nixUnstable; # or versioned attributes like nix_2_4
-  # extraOptions = ''
-  #   experimental-features = nix-command flakes
-  # '';
-};
+nix.package = pkgs.nix_2_4;
+#+end_src
+
+** CLI
+
+Console / terminal / headless packages
+
+#+begin_src nix :noweb-ref home-packages
+ag
+ripgrep
+htop
+awscli2
+cmake
+fd
+file
+git
+gnupg
+hub
+imagemagick
+jq
+ledger
+libtool
+ncdu
+nodejs
+pass
+pkgs.nodePackages.node2nix
+ripgrep
+tree
+tree
+unzip
+wmctrl
+xclip
+xdotool
+yarn
+#+end_src
+
+** Desktop
+
+GUI applications for window environment
+
+#+begin_src nix :noweb-ref home-packages
+  tilda
+  tridactyl-native
+  chromium
+  deluge
+  pavucontrol
+  tdesktop
+  # tor-browser-bundle-bin
+  slack
+  vscode
+  obsidian
+  discord
+  vlc
+  pkgs.gnome.gnome-tweaks
+  obs-studio
+  element-desktop
+#+end_src
+
+Need to whitelist some unfree packages.
+
+#+begin_src nix :noweb-ref unfree-packages
+  "slack"
+  "vscode"
+  "discord"
+  "obsidian"
+#+end_src
+
+** Unfree
+
+Need to enable some unfree packages
+
+#+begin_src nix :noweb-ref home-configuration
+nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (pkgs.lib.getName pkg) [
+  <<unfree-packages>>
+];
 #+end_src
 
 ** Home Manager
@@ -222,96 +274,17 @@ nixpkgs.config.packageOverrides = pkgs: {
 };
 #+end_src
 
-* Terminal
+** COMMENT Flakes
 
-** Packages
-
-Console / terminal / headless packages
-
-#+begin_src nix :noweb-ref home-packages
-ag
-ripgrep
-htop
-awscli2
-cmake
-fd
-file
-git
-gnupg
-hub
-imagemagick
-jq
-ledger
-libtool
-ncdu
-nodejs
-pass
-pkgs.nodePackages.node2nix
-ripgrep
-tree
-tree
-unzip
-wmctrl
-xclip
-xdotool
-yarn
-#+end_src
-
-** bash
 #+begin_src nix
-programs.bash = {
-  enable = true;
-  historySize = 100000;
-  historyFileSize = 100000;
-  historyControl = ["ignoredups" "erasedups"];
-  initExtra = ''
-      source "$HOME/.nix-profile/etc/profile.d/hm-session-vars.sh"
-      export PATH="$HOME/.npm-packages/bin:$PATH"
-    '';
-  # bashrcExtra = ''
-  #   export PROMPT_COMMAND="history -a; history -c; history -r"
-  # '';
-  enableVteIntegration = true;
-};
-
-#+end_src
-** sudo
-
-Increase sudo password timeout
-
-#+begin_src nix :noweb-ref system-configuration
-security.sudo.extraConfig = ''
-    Defaults        env_reset,timestamp_timeout=30
+nix = {
+  package = pkgs.nixUnstable; # or versioned attributes like nix_2_4
+  extraOptions = ''
+    experimental-features = nix-command flakes
   '';
-#+end_src
-
-** vim
-
-#+begin_src nix :noweb-ref system-configuration
-# Use vim as default editor
-programs.vim.defaultEditor = true;
-#+end_src
-
-** COMMENT locate
-
-#+begin_src nix :noweb-ref system-configuration
-# Enable `locate` command
-services.locate = {
-  enable = true;
-  locate = pkgs.mlocate;
-  localuser = null;
-  interval = "1h";
 };
 #+end_src
-** COMMENT gpg-agent
 
-  #+begin_src nix
-  services.gpg-agent = {
-    enable = true;
-    defaultCacheTtl = 1800;
-    enableSshSupport = true;
-  };
-  #+end_src
 * Desktop
 
 #+begin_src nix :noweb-ref system-configuration
@@ -373,7 +346,7 @@ dconf.settings = {
 #+begin_src nix :noweb-ref dconf-keymap
 "<Super>e" = {
     name = "Switch to Emacs";
-    command = "launch-or-raise  -W emacs emacs";
+    command = "launch-or-raise -W emacs emacs";
 };
 "<Shift><Super>e" = {
     name = "Switch to Element";
@@ -429,15 +402,7 @@ dconf.settings = {
 };
 #+end_src
 
-*** COMMENT paperwm
-
-Install extension for tiling windows
-
-#+begin_src nix :noweb-ref home-packages
-gnomeExtensions.paperwm
-#+end_src
-
-** XMonad
+** COMMENT XMonad
 
 #+begin_src nix :noweb-ref system-configuration
 services.xserver.windowManager.xmonad.enable = true;
@@ -445,21 +410,33 @@ services.xserver.windowManager.xmonad.enable = true;
 
 ** Emacs
 
+*** COMMENT Install using home-manager
+
+#+begin_src nix :noweb-ref home-packages
+(let emacsPackages = pkgs.emacsPackagesFor pkgs.emacs;
+ in emacsPackages.emacsWithPackages (epkgs: [epkgs.vterm]))
+#+end_src
+
+*** Install from nixpkgs
+
 #+begin_src nix :noweb-ref system-configuration
 services.emacs.enable = true;
 #+end_src
 
-*** vterm
+**** vterm
 
 #+begin_src nix :noweb-ref system-configuration
 services.emacs.package =
   let emacsPackages = pkgs.emacsPackagesFor pkgs.emacs;
   in emacsPackages.emacsWithPackages (epkgs: [epkgs.vterm]);
 #+end_src
-** Firefox
+
+** Firefox (system)
+
 #+begin_src nix :noweb-ref system-packages
 firefox
 #+end_src
+
 ** COMMENT Firefox
 
 #+begin_src nix
@@ -467,7 +444,7 @@ programs.firefox.enable = true;
 #+end_src
 
 *** Native extensions
-
+#
 #+begin_src nix
 programs.firefox.package = pkgs.firefox.override {
   # See nixpkgs' firefox/wrapper.nix to check which options you can use
@@ -500,41 +477,6 @@ home.sessionVariables = {
 #+end_src
 
 
-** Packages
-
-GUI applications for window environment
-
-#+begin_src nix :noweb-ref home-packages
-  tilda
-  tridactyl-native
-  chromium
-  deluge
-  pavucontrol
-  tdesktop
-  # tor-browser-bundle-bin
-  slack
-  vscode
-  obsidian
-  discord
-  vlc
-  pkgs.gnome.gnome-tweaks
-  obs-studio
-  element-desktop
-#+end_src
-
-*** Unfree
-
-Need to enable some unfree packages
-
-#+begin_src nix :noweb-ref home-configuration
-nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (pkgs.lib.getName pkg) [
-  "slack"
-  "vscode"
-  "discord"
-  "obsidian"
-];
-#+end_src
-
 ** Fonts
 
 #+begin_src nix :noweb-ref system-configuration
@@ -556,9 +498,78 @@ fonts = {
   ];
 };
 #+end_src
+* Terminal
 
-** COMMENT Touchbar
+** COMMENT fish
+
+
+#+begin_src nix :noweb-ref home-configuration
+programs.fish = {
+  enable = true;
+  plugins = [{
+    name = "z";
+    src = pkgs.fetchFromGitHub {
+      owner = "jethrokuan";
+      repo = "z";
+      rev = "e0e1b9dfdba362f8ab1ae8c1afc7ccf62b89f7eb";
+      sha256 = "0dbnir6jbwjpjalz14snzd3cgdysgcs3raznsijd6savad3qhijc";
+    };
+  }];
+};
+#+end_src
+
+** bash
+#+begin_src nix
+programs.bash = {
+  enable = true;
+  historySize = 100000;
+  historyFileSize = 100000;
+  historyControl = ["ignoredups" "erasedups"];
+  initExtra = ''
+      source "$HOME/.nix-profile/etc/profile.d/hm-session-vars.sh"
+      export PATH="$HOME/.npm-packages/bin:$PATH"
+    '';
+  # bashrcExtra = ''
+  #   export PROMPT_COMMAND="history -a; history -c; history -r"
+  # '';
+  enableVteIntegration = true;
+};
+
+#+end_src
+** sudo
+
+Increase sudo password timeout
 
 #+begin_src nix :noweb-ref system-configuration
-services.touchegg.enable = true;
+security.sudo.extraConfig = ''
+    Defaults        env_reset,timestamp_timeout=30
+  '';
 #+end_src
+
+** vim
+
+#+begin_src nix :noweb-ref system-configuration
+# Use vim as default editor
+programs.vim.defaultEditor = true;
+#+end_src
+
+** locate
+
+#+begin_src nix :noweb-ref system-configuration
+# Enable `locate` command
+services.locate = {
+  enable = true;
+  locate = pkgs.mlocate;
+  localuser = null;
+  interval = "1h";
+};
+#+end_src
+** gpg-agent
+
+  #+begin_src nix
+  services.gpg-agent = {
+    enable = true;
+    defaultCacheTtl = 1800;
+    enableSshSupport = true;
+  };
+  #+end_src
