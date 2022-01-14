@@ -6,4 +6,6 @@
                       (add-hook 'after-save-hook 'recompile nil 'local)
                       (add-hook 'org-babel-post-tangle-hook 'recompile nil 'local)))))
 
- (nil . ((compile-command . "nixos-rebuild switch"))))
+ (nil . ((eval . (add-hook 'after-save-hook 'recompile nil 'local))
+         (compile-command . "nixos-rebuild switch")))
+)

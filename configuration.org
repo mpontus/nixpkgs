@@ -1,1 +1,564 @@
-/home/mpontus/nixos.org
+# -*- eval: (add-hook 'after-save-hook 'org-babel-tangle nil 'local) -*-
+#+TITLE: System configuration
+#+STARTUP: showall
+#+PROPERTY: header-args :tangle no :noweb yes :noweb-ref home-configuration
+
+#+BEGIN_SRC nix :tangle /sudo::/etc/nixos/configuration.nix :noweb-ref none
+# edit this configuration file to define what should be installed on
+# your system.  help is available in the configuration.nix(5) man page
+# and in the nixos manual (accessible by running ‘nixos-help’).
+{ config, lib, pkgs, ... }:
+
+{
+  imports =
+    [ # include the results of the hardware scan.
+      ./hardware-configuration.nix
+      <<import-files>>
+    ];
+
+  environment.systemPackages = with pkgs; [
+    <<system-packages>>
+  ];
+
+  <<system-configuration>>
+  # this value determines the nixos release from which the default
+  # settings for stateful data, like file locations and database versions
+  # on your system were taken. it‘s perfectly fine and recommended to leave
+  # this value at the release version of the first install of this system.
+  # before changing this value read the documentation for this option
+  # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
+  system.stateVersion = "21.05"; # did you read the comment?
+}
+#+END_SRC
+
+* System Configuration
+:PROPERTIES:
+:header-args: :tangle no :noweb yes :noweb-ref system-configuration
+:END:
+** Boot loader
+
+#+begin_src nix
+# Use the systemd-boot EFI boot loader.
+boot.loader.systemd-boot.enable = true;
+boot.loader.efi.canTouchEfiVariables = true;
+#+end_src
+
+** Hostname
+#+begin_src nix
+networking.hostName = "nixos"; # Define your hostname.
+#+end_src
+** Time zone
+
+#+begin_src nix
+# Set your time zone.
+time.timeZone = "Europe/Moscow";
+#+end_src
+
+** Users
+
+*** COMMENT Immutable users
+
+#+begin_src nix
+users.mutableUsers = false;
+#+end_src
+
+*** Root password
+
+Don't forget to reset a password with ‘passwd’
+
+#+begin_src nix
+users.users.root.initialPassword = "nixos";
+#+end_src
+
+*** Unprivileged user
+
+#+begin_src nix
+users.users.mpontus = {
+  isNormalUser = true;
+  hashedPassword = "$6$QrKXg5g6nEHsWbkm$GdlWBtzXoQo7djWCJcMYcAZ/Zypk13Bq6nETchLc49hstumtoZ2q0tKvvrX3CLxqEmnZhDA8/0aw/Sen9mo5L/";
+  extraGroups = [ "wheel" "pcspkr" ];
+};
+#+end_src
+
+*** Run commands found in `$PATH/bin`
+
+#+begin_src nix
+environment.homeBinInPath = true;
+#+end_src
+
+** Networking
+
+*** COMMENT Wireless
+
+#+begin_src nix
+networking.wireless.enable = true;
+#+end_src
+
+*** DHCP
+
+#+begin_src nix
+networking.useDHCP = false;
+networking.interfaces.wlp2s0.useDHCP = true;
+#+end_src
+
+*** COMMENT Firewall
+
+# TODO: Needed for vm?
+Disabled
+
+#+begin_src nix
+# Open ports in the firewall.
+# networking.firewall.allowedTCPPorts = [ ... ];
+# networking.firewall.allowedUDPPorts = [ ... ];
+# Or disable the firewall altogether.
+networking.firewall.enable = false;
+#+end_src
+
+*** COMMENT Spoof default TTL
+
+#+begin_src nix
+boot.kernel.sysctl = {
+  "net.ipv4.ip_default_ttl" = 65;
+};
+
+#+end_src
+** Sound
+
+#+begin_src nix
+sound.enable = true;
+#+end_src
+
+*** Pulseaudio
+
+#+begin_src nix
+hardware.pulseaudio.enable = true;
+#+end_src
+
+*** Bluetooth audio
+
+#+begin_src nix
+hardware.bluetooth = {
+  enable = true;
+  settings = {
+    General = {
+      # Disable = "Headset";
+      Enable = "Source,Sink,Headet,Media,Socket";
+      # Disable = "Socket";
+      # MultiProfile = "multiple";
+    };
+  };
+};
+#+end_src
+
+*** COMMENT Blueman
+
+#+begin_src nix
+
+# environment.systemPackages = [ pkgs.blueman ];
+services.blueman.enable = true;
+#+end_src
+
+** Virtualization
+*** Qemu
+
+#+begin_src nix :noweb-ref system-packages
+pkgs.virt-manager
+#+end_src
+
+#+begin_src nix
+virtualisation.libvirtd.enable= true;
+boot.kernelModules = ["kvm-intel" "kvm-amd"];
+#+end_src
+*** COMMENT Virtualbox
+
+#+begin_src nix
+nixpkgs.config.allowUnfree = true;
+virtualisation.virtualbox.host.enable = true;
+virtualisation.virtualbox.host.enableExtensionPack = true;
+users.extraGroups.vboxusers.members = ["mpontus"];
+#+end_src
+** Flakes
+
+#+begin_src nix
+nix = {
+  package = pkgs.nixUnstable; # or versioned attributes like nix_2_4
+  # extraOptions = ''
+  #   experimental-features = nix-command flakes
+  # '';
+};
+#+end_src
+
+** Home Manager
+
+Load home-amanger module
+
+#+begin_src nix :noweb-ref import-files
+<home-manager/nixos>
+#+end_src
+
+Configure home environment
+
+#+begin_src nix
+home-manager.users.mpontus = { pkgs, ... }: {
+  imports = [
+    <<home-import-files>>
+  ];
+  home.packages = with pkgs; [
+    <<home-packages>>
+  ];
+  <<home-configuration>>
+};
+#+end_src
+
+*** NUR
+
+Enable custom user repositories
+
+#+begin_src nix :noweb-ref home-configuration
+nixpkgs.config.packageOverrides = pkgs: {
+  nur = import (builtins.fetchTarball "https://github.com/nix-community/NUR/archive/master.tar.gz") {
+    inherit pkgs;
+  };
+};
+#+end_src
+
+* Terminal
+
+** Packages
+
+Console / terminal / headless packages
+
+#+begin_src nix :noweb-ref home-packages
+ag
+ripgrep
+htop
+awscli2
+cmake
+fd
+file
+git
+gnupg
+hub
+imagemagick
+jq
+ledger
+libtool
+ncdu
+nodejs
+pass
+pkgs.nodePackages.node2nix
+ripgrep
+tree
+tree
+unzip
+wmctrl
+xclip
+xdotool
+yarn
+#+end_src
+
+** bash
+#+begin_src nix
+programs.bash = {
+  enable = true;
+  historySize = 100000;
+  historyFileSize = 100000;
+  historyControl = ["ignoredups" "erasedups"];
+  initExtra = ''
+      source "$HOME/.nix-profile/etc/profile.d/hm-session-vars.sh"
+      export PATH="$HOME/.npm-packages/bin:$PATH"
+    '';
+  # bashrcExtra = ''
+  #   export PROMPT_COMMAND="history -a; history -c; history -r"
+  # '';
+  enableVteIntegration = true;
+};
+
+#+end_src
+** sudo
+
+Increase sudo password timeout
+
+#+begin_src nix :noweb-ref system-configuration
+security.sudo.extraConfig = ''
+    Defaults        env_reset,timestamp_timeout=30
+  '';
+#+end_src
+
+** vim
+
+#+begin_src nix :noweb-ref system-configuration
+# Use vim as default editor
+programs.vim.defaultEditor = true;
+#+end_src
+
+** COMMENT locate
+
+#+begin_src nix :noweb-ref system-configuration
+# Enable `locate` command
+services.locate = {
+  enable = true;
+  locate = pkgs.mlocate;
+  localuser = null;
+  interval = "1h";
+};
+#+end_src
+** COMMENT gpg-agent
+
+  #+begin_src nix
+  services.gpg-agent = {
+    enable = true;
+    defaultCacheTtl = 1800;
+    enableSshSupport = true;
+  };
+  #+end_src
+* Desktop
+
+#+begin_src nix :noweb-ref system-configuration
+services.xserver.enable = true;
+#+end_src
+
+** Gnome
+
+Enable the GNOME Desktop Environment
+
+#+begin_src nix :noweb-ref system-configuration
+services.xserver.displayManager.gdm.enable = true;
+services.xserver.desktopManager.gnome.enable = true;
+#+end_src
+
+*** Auto-login
+
+#+begin_src nix :noweb-ref system-configuration
+systemd.services."getty@tty1".enable = true;
+systemd.services."autovt@tty1".enable = true;
+services.xserver.displayManager.autoLogin.enable = true;
+services.xserver.displayManager.autoLogin.user = "mpontus";
+#+end_src
+
+*** dconf-editor
+
+#+begin_src nix :noweb-ref home-packages
+gnome.dconf-editor
+#+end_src
+
+DConf settings
+
+#+begin_src nix
+dconf.settings = {
+  <<dconf-settings>>
+} // (lib.trivial.pipe {
+  <<dconf-keymap>>
+} [
+    (lib.attrsets.mapAttrsToList (binding: { name, command }: {
+        inherit binding name command;
+    }))
+    (lib.lists.imap0 (i: value: {
+        name = "org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom${toString(i)}";
+        inherit value;
+    }))
+    lib.attrsets.listToAttrs
+  ]
+);
+#+end_src
+
+**** Disable warning when opening dconf-editor
+
+#+begin_src nix :noweb-ref dconf-settings
+"ca/desrt/dconf-editor" = { show-warning = false; };
+#+end_src
+
+**** Keybindings
+
+#+begin_src nix :noweb-ref dconf-keymap
+"<Super>e" = {
+    name = "Switch to Emacs";
+    command = "launch-or-raise  -W emacs emacs";
+};
+"<Shift><Super>e" = {
+    name = "Switch to Element";
+    command = "launch-or-raise -r -W element element-desktop";
+};
+"<Super>w" = {
+    name = "Switch to Firefox";
+    command = "launch-or-raise -r -c 'firefox' \"Mozilla Firefox\"";
+};
+"<Shift><Super>c" = {
+    name = "Switch to Chromium";
+    command = "launch-or-raise -W chromium-browser -c chromium-browser";
+};
+"<Super>t" = {
+    name = "Switch to Telegram";
+    command = "launch-or-raise -r -c telegram-desktop Telegram";
+};
+"<Shift><Super>w" = {
+    name = "Switch to Tor Browser";
+    command = "launch-or-raise -r -c 'tor-browser' \"Tor Browser\"";
+};
+"<Super>m" = {
+    name = "Open System Monitor";
+    command = "launch-or-raise  -W gnome-system-monitor gnome-system-monitor";
+};
+"<Super>r" = {
+    name = "Switch to Roam";
+    command = "launch-or-raise -W \"roam research\" roam-research";
+};
+"<Super>c" = {
+    name = "Switch to Console";
+    command = "launch-or-raise -W gnome-terminal-server -c gnome-terminal";
+};
+"<Super>s" = {
+    name = "Switch to Slack";
+    command = "launch-or-raise -c slack Slack";
+};
+"<Super>i" = {
+    name = "Switch to Obsidian";
+    command = "obsidian";
+};
+"<Super>a" = {
+    name = "Switch to Amazing Marvin";
+    command = "launch-or-raise  Marvin";
+};
+"<Super>v" = {
+    name = "Switch to VSCode";
+    command = "launch-or-raise -r -W Code code";
+};
+"<Shift><Super>t" = {
+    name = "Switch to TopTracker";
+    command = "launch-or-raise -W toptracker -c TopTracker";
+};
+#+end_src
+
+*** COMMENT paperwm
+
+Install extension for tiling windows
+
+#+begin_src nix :noweb-ref home-packages
+gnomeExtensions.paperwm
+#+end_src
+
+** XMonad
+
+#+begin_src nix :noweb-ref system-configuration
+services.xserver.windowManager.xmonad.enable = true;
+#+end_src
+
+** Emacs
+
+#+begin_src nix :noweb-ref system-configuration
+services.emacs.enable = true;
+#+end_src
+
+*** vterm
+
+#+begin_src nix :noweb-ref system-configuration
+services.emacs.package =
+  let emacsPackages = pkgs.emacsPackagesFor pkgs.emacs;
+  in emacsPackages.emacsWithPackages (epkgs: [epkgs.vterm]);
+#+end_src
+** Firefox
+#+begin_src nix :noweb-ref system-packages
+firefox
+#+end_src
+** COMMENT Firefox
+
+#+begin_src nix
+programs.firefox.enable = true;
+#+end_src
+
+*** Native extensions
+
+#+begin_src nix
+programs.firefox.package = pkgs.firefox.override {
+  # See nixpkgs' firefox/wrapper.nix to check which options you can use
+  cfg = {
+    # Gnome shell native connector
+    enableGnomeExtensions = true;
+    # Tridactyl native connector
+    enableTridactylNative = true;
+  };
+};
+#+end_src
+
+*** Addons
+
+#+begin_src nix
+programs.firefox.extensions = with pkgs.nur.repos.rycee.firefox-addons; [
+  https-everywhere
+  privacy-badger
+];
+#+end_src
+
+*** Gestures
+
+Make firefox use xinput2 for improved touchscreen support
+
+#+begin_src nix
+home.sessionVariables = {
+  MOZ_USE_XINPUT2 = "1";
+};
+#+end_src
+
+
+** Packages
+
+GUI applications for window environment
+
+#+begin_src nix :noweb-ref home-packages
+  tilda
+  tridactyl-native
+  chromium
+  deluge
+  pavucontrol
+  tdesktop
+  # tor-browser-bundle-bin
+  slack
+  vscode
+  obsidian
+  discord
+  vlc
+  pkgs.gnome.gnome-tweaks
+  obs-studio
+  element-desktop
+#+end_src
+
+*** Unfree
+
+Need to enable some unfree packages
+
+#+begin_src nix :noweb-ref home-configuration
+nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (pkgs.lib.getName pkg) [
+  "slack"
+  "vscode"
+  "discord"
+  "obsidian"
+];
+#+end_src
+
+** Fonts
+
+#+begin_src nix :noweb-ref system-configuration
+fonts = {
+  enableDefaultFonts = false;
+  fonts = with pkgs; [
+    noto-fonts
+    noto-fonts-cjk
+    # noto-fonts-emoji
+    twitter-color-emoji
+    liberation_ttf
+    fira-code
+    fira-code-symbols
+    mplus-outline-fonts
+    dina-font
+    proggyfonts
+    source-code-pro
+    gentium
+  ];
+};
+#+end_src
+
+** COMMENT Touchbar
+
+#+begin_src nix :noweb-ref system-configuration
+services.touchegg.enable = true;
+#+end_src
