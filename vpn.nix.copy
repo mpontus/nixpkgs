@@ -1,0 +1,23 @@
+{ config, pkgs, lib, ... }:
+let
+  pkg = pkgs.fetchzip {
+    url = "https://www.privateinternetaccess.com/openvpn/openvpn.zip";
+    sha256 = "0vxm18gzn7fi7dd85rmj3hnbral568bgczhvgi8cb348lx5i23v4";
+    stripRoot = false;
+  };
+  # TODO: Use secure credentials storage
+  authUserPass = {
+    username = "p7919690";
+    password = "n3imRaNv35";
+  };
+  pia = name: {
+    inherit authUserPass;
+    config = '' config ${pkg}/${name}.ovpn '';
+    autoStart = false;
+  };
+in with builtins; {
+  services.openvpn.servers = listToAttrs
+    (map (name: { inherit name; value = pia name; })
+      (map (lib.removeSuffix ".ovpn")
+        (attrNames (readDir pkg))));
+}
