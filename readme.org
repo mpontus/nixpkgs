@@ -20,12 +20,20 @@
       <<system-packages>>
     ];
 
+    nixpkgs.overlays = [
+      <<overlays>>
+    ];
 
     nixpkgs.config.permittedInsecurePackages = [
       <<insecure-packages>>
     ];
 
+    nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [
+      <<unfree-packages>>
+    ];
+
     <<system-configuration>>
+
     # this value determines the nixos release from which the default
     # settings for stateful data, like file locations and database versions
     # on your system were taken. it‘s perfectly fine and recommended to leave
@@ -36,7 +44,96 @@
   }
 #+END_SRC
 
-* System configuration
+* Nix
+** Flakes
+
+#+begin_src nix :noweb-ref system-configuration
+nix.extraOptions = ''
+  experimental-features = nix-command flakes
+'';
+#+end_src
+
+** Home Manager
+
+Load home-manager module
+
+#+begin_src nix :noweb-ref import-files
+  <home-manager/nixos>
+#+end_src
+
+Configure home environment
+
+#+begin_src nix :noweb-ref system-configuration
+  home-manager.users.mpontus = { pkgs, ... }: {
+    imports = [
+      <<home-import-files>>
+    ];
+
+    home.packages = with pkgs; [
+      <<home-packages>>
+    ];
+
+
+    <<home-configuration>>
+
+  };
+#+end_src
+
+*** Use global nixpkgs
+
+#+begin_src nix :noweb-ref system-configuration
+home-manager.useGlobalPkgs = true;
+#+end_src
+
+*** NUR
+
+Enable custom user repositories
+
+#+begin_src nix :noweb-ref home-configuration
+  nixpkgs.config.packageOverrides = pkgs: {
+    nur = import (builtins.fetchTarball "https://github.com/nix-community/NUR/archive/master.tar.gz") {
+      inherit pkgs;
+    };
+  };
+#+end_src
+
+*** Root user
+
+Give root user git
+
+#+begin_src nix :noweb-ref system-configuration
+  home-manager.users.root = { pkgs, ... }: {
+    home.packages = with pkgs; [ htop git ];
+  };
+#+end_src
+
+*** COMMENT Unfree packages?
+
+#+begin_src nix :noweb-ref home-configuration
+  nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (pkgs.lib.getName pkg) [
+    <<unfree-packages>>
+  ];
+#+end_src
+
+** Store optimization
+
+#+begin_src nix
+nix.settings.auto-optimise-store = true;
+#+end_src
+
+** Unstable channel
+
+#+begin_src nix :noweb-ref system-configuration
+nix.package = pkgs.nixUnstable;
+#+end_src
+
+** TODO COMMENT Figure out what's pulling nodejs-12
+
+#+begin_src nix :noweb-ref insecure-packages
+"nodejs-12.22.12"
+#+end_src
+
+* System
 ** Boot loader
 
 #+begin_src nix
@@ -45,29 +142,86 @@
   boot.loader.efi.canTouchEfiVariables = true;
 #+end_src
 
-** Networking
+** Time zone
 
+#+begin_src nix
+  # Set your time zone.
+  time.timeZone = "Europe/Moscow";
+#+end_src
+
+** Users
+
+#+begin_src nix
+  users.users.mpontus = {
+    isNormalUser = true;
+    hashedPassword = "$6$QrKXg5g6nEHsWbkm$GdlWBtzXoQo7djWCJcMYcAZ/Zypk13Bq6nETchLc49hstumtoZ2q0tKvvrX3CLxqEmnZhDA8/0aw/Sen9mo5L/";
+    extraGroups = [ "wheel" "pcspkr" ];
+  };
+#+end_src
+
+*** sudo
+
+Increase sudo password timeout
+
+#+begin_src nix :noweb-ref system-configuration
+  security.sudo.extraConfig = ''
+    Defaults        env_reset,timestamp_timeout=30
+  '';
+#+end_src
+
+*** Enable `$HOME/bin` in $PATH for normal users
+
+#+begin_src nix
+  environment.homeBinInPath = true;
+#+end_src
+
+*** COMMENT Root password
+
+Don't forget to reset a password with ‘passwd’
+
+#+begin_src nix
+  users.users.root.initialPassword = "nixos";
+#+end_src
+
+*** XDG environment
+
+#+begin_src nix
+  environment.sessionVariables = rec {
+    XDG_CACHE_HOME  = "\${HOME}/.cache";
+    XDG_CONFIG_HOME = "\${HOME}/.config";
+    XDG_BIN_HOME    = "\${HOME}/.local/bin";
+    XDG_DATA_HOME   = "\${HOME}/.local/share";
+
+    PATH = [
+      "\${XDG_BIN_HOME}"
+    ];
+  };
+#+end_src
+
+** Networking
 *** Hostname
 
 #+begin_src nix
   networking.hostName = "nixos"; # Define your hostname.
 #+end_src
 
-*** COMMENT Private Internet Access
-
-#+begin_src nix :noweb-ref overlays
-  (self: super: {
-    piavpn = super.callPackage ./pkgs/piavpn { };
-  })
-#+end_src
-
-#+begin_src nix :noweb-ref import-files
-./modules/piavpn.nix
-#+end_src
-
+*** DHCP
 
 #+begin_src nix
-services.piavpn.enable = true;
+  networking.useDHCP = false;
+  networking.interfaces.wlp2s0.useDHCP = true;
+#+end_src
+
+*** Firewall
+
+Disabled to allow visiting locally running website from mobile
+
+#+begin_src nix
+  # Open ports in the firewall.
+  # networking.firewall.allowedTCPPorts = [ ... ];
+  # networking.firewall.allowedUDPPorts = [ ... ];
+  # Or disable the firewall altogether.
+  networking.firewall.enable = false;
 #+end_src
 
 *** VPN
@@ -77,7 +231,7 @@ services.openvpn.servers.pia = {
   config = "config ${pkgs.fetchzip {
     url = "https://www.privateinternetaccess.com/openvpn/openvpn.zip";
     sha256 = "0vxm18gzn7fi7dd85rmj3hnbral568bgczhvgi8cb348lx5i23v4";
-    stripRoot = false;
+    stripRoot = false   ;
   }}/netherlands.ovpn";
 };
 #+end_src
@@ -104,69 +258,7 @@ networking.networkmanager.dispatcherScripts = [
 
 #+end_src
 
-*** Custom hosts
-
-#+begin_src nix
-networking.extraHosts = ''
-  127.0.0.1 ipfs.local
-'';
-#+end_src
-
-** Time zone
-
-#+begin_src nix
-  # Set your time zone.
-  time.timeZone = "Europe/Moscow";
-#+end_src
-
-** Users
-
-*** Root password
-
-Don't forget to reset a password with ‘passwd’
-
-#+begin_src nix
-  users.users.root.initialPassword = "nixos";
-#+end_src
-
-*** Unprivileged user
-
-#+begin_src nix
-  users.users.mpontus = {
-    isNormalUser = true;
-    hashedPassword = "$6$QrKXg5g6nEHsWbkm$GdlWBtzXoQo7djWCJcMYcAZ/Zypk13Bq6nETchLc49hstumtoZ2q0tKvvrX3CLxqEmnZhDA8/0aw/Sen9mo5L/";
-    extraGroups = [ "wheel" "pcspkr" ];
-  };
-#+end_src
-
-*** Run commands found in `$PATH/bin`
-
-#+begin_src nix
-  environment.homeBinInPath = true;
-#+end_src
-
-** Networking
-
-*** DHCP
-
-#+begin_src nix
-  networking.useDHCP = false;
-  networking.interfaces.wlp2s0.useDHCP = true;
-#+end_src
-
-*** Firewall
-
-Disabled to allow visiting locally running website from mobile
-
-#+begin_src nix
-  # Open ports in the firewall.
-  # networking.firewall.allowedTCPPorts = [ ... ];
-  # networking.firewall.allowedUDPPorts = [ ... ];
-  # Or disable the firewall altogether.
-  networking.firewall.enable = false;
-#+end_src
-
-*** Spoof default TTL
+*** Spoof defalt ttl
 
 #+begin_src nix
 boot.kernel.sysctl = {
@@ -175,75 +267,7 @@ boot.kernel.sysctl = {
 
 #+end_src
 
-** Bluetooth
-
-#+begin_src nix
-hardware.bluetooth.enable = true;
-#+end_src
-
-** Sound
-
-#+begin_src nix
-  sound.enable = true;
-#+end_src
-
-*** PulseAudio
-
-#+begin_src nix
-hardware.pulseaudio.enable = true;
-#+end_src
-
-**** Bluetooth support for PulseAudio
-
-#+begin_src nix
-hardware.pulseaudio.package = pkgs.pulseaudioFull;
-hardware.pulseaudio.extraConfig = "
-  load-module module-switch-on-connect
-";
-#+end_src
-
-*** COMMENT Bluetooth audio
-
-#+begin_src nix
-  hardware.bluetooth.settings = {
-    General = {
-        # Disable = "Headset";
-        # Enable = "Source,Sink,Headet,Media,Socket";
-        # Disable = "Socket";
-        # MultiProfile = "multiple";
-    };
-  };
-#+end_src
-
-*** COMMENT Blueman
-
-#+begin_src nix
-  services.blueman.enable = true;
-#+end_src
-
 ** Virtualization
-*** Docker
-
-#+begin_src nix
-  virtualisation.docker.enable = true;
-#+end_src
-
-**** Add user to docker group
-
-#+begin_src nix :noweb-ref system-configuration
-  users.extraGroups.docker.members = ["mpontus"];
-#+end_src
-
-**** Mitigate hangs on system shutdown
-
-See https://discourse.nixos.org/t/docker-hanging-on-reboot/18270
-
-#+begin_src nix :noweb-ref system-configuration
-virtualisation.docker.liveRestore = false;
-#+end_src
-
-*** Qemu
-
 #+begin_src nix :noweb-ref system-packages
   pkgs.virt-manager
 #+end_src
@@ -253,7 +277,7 @@ virtualisation.docker.liveRestore = false;
   virtualisation.libvirtd.enable = true;
 #+end_src
 
-**** Increase default msize
+*** Increase default msize
 
 #+begin_src nix :noweb-ref system-configuration
 environment.variables = {
@@ -261,150 +285,34 @@ environment.variables = {
 };
 #+end_src
 
-*** COMMENT Virtualbox
-
-#+begin_src nix :noweb-ref nonfree-packages
-  "Oracle_VM_VirtualBox_Extension_Pack"
-#+end_src
+* Desktop
+** Fonts
 
 #+begin_src nix :noweb-ref system-configuration
-  virtualisation.virtualbox.host.enable = true;
-  virtualisation.virtualbox.host.enableExtensionPack = true;
-  users.extraGroups.vboxusers.members = ["mpontus"];
-#+end_src
-
-* Packages
-
-Follow Nixpkgs unstable channel
-
-#+begin_src nix :noweb-ref system-configuration
-nix.package = pkgs.nixUnstable;
-#+end_src
-
-Enable automatic store optimization
-
-#+begin_src nix
-nix.autoOptimiseStore = true;
-#+end_src
-
-** TODO Permit legacy nodejs for now
-
-#+begin_src nix :noweb-ref insecure-packages
-"nodejs-12.22.12"
-#+end_src
-
-** Overlays
-#+begin_src nix
-nixpkgs.overlays = [
-  <<overlays>>
-];
-#+end_src
-** Home Manager
-*** Install
-
-Load home-manager module
-
-#+begin_src nix :noweb-ref import-files
-  <home-manager/nixos>
-#+end_src
-
-Use global nixpkgs
-
-#+begin_src nix :noweb-ref system-configuration
-home-manager.useGlobalPkgs = true;
-#+end_src
-
-*** Root user
-
-Give root user git
-
-#+begin_src nix :noweb-ref system-configuration
-  home-manager.users.root = { pkgs, ... }: {
-    home.packages = with pkgs; [ htop git ];
-  };
-#+end_src
-
-*** Privileged user
-
-Configure home environment
-
-#+begin_src nix :noweb-ref system-configuration
-  home-manager.users.mpontus = { pkgs, ... }: {
-    imports = [
-      <<home-import-files>>
-    ];
-    home.packages = with pkgs; [
-      <<home-packages>>
-    ];
-    <<home-configuration>>
-  };
-#+end_src
-
-*** NUR
-
-Enable custom user repositories
-
-#+begin_src nix :noweb-ref home-configuration
-  nixpkgs.config.packageOverrides = pkgs: {
-    nur = import (builtins.fetchTarball "https://github.com/nix-community/NUR/archive/master.tar.gz") {
-      inherit pkgs;
-    };
-  };
-#+end_src
-
-** Flakes
-
-#+begin_src nix :noweb-ref system-configuration
-nix.extraOptions = ''
-  experimental-features = nix-command flakes
-'';
-#+end_src
-
-** Unfree
-
-Enable unfree packages
-
-#+begin_src nix :noweb-ref system-configuration
-nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [
-  <<unfree-packages>>
-];
-#+end_src
-
-For Home Manager too
-
-#+begin_src nix :noweb-ref home-configuration
-nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (pkgs.lib.getName pkg) [
-   <<unfree-packages>>
-];
-#+end_src
-
-** System packages
-
-#+begin_src nix :noweb-ref system-packages
-git git-lfs discord
-#+end_src
-
-** XDG
-#+begin_src nix
-  environment.sessionVariables = rec {
-    XDG_CACHE_HOME  = "\${HOME}/.cache";
-    XDG_CONFIG_HOME = "\${HOME}/.config";
-    XDG_BIN_HOME    = "\${HOME}/.local/bin";
-    XDG_DATA_HOME   = "\${HOME}/.local/share";
-
-    PATH = [
-      "\${XDG_BIN_HOME}"
+  fonts = {
+    enableDefaultFonts = false;
+    fonts = with pkgs; [
+      noto-fonts
+      noto-fonts-cjk
+      noto-fonts-emoji
+      twitter-color-emoji
+      liberation_ttf
+      fira-code
+      fira-code-symbols
+      # mplus-outline-fonts
+      dina-font
+      proggyfonts
+      source-code-pro
+      gentium
+      (nerdfonts.override { fonts = [ "FiraCode" "DroidSansMono" ]; })
     ];
   };
 #+end_src
-* Desktop / GUI
-
-** XServer
+** Xorg
 
 #+begin_src nix :noweb-ref system-configuration
   services.xserver.enable = true;
 #+end_src
-
 
 *** Attempt to fix window flickering
 
@@ -423,72 +331,12 @@ EndSection
 '';
 #+end_src
 
-
-** Packages
-
-Whitelist unfree packages
-
-#+begin_src nix :noweb-ref unfree-packages
-  "slack" "vscode" "discord" "obsidian" "postman" "bluejeans"
-#+end_src
-
-GUI applications for window environment
-
-#+begin_src nix :noweb-ref home-packages
-tilda  deluge pavucontrol tdesktop slack vscode obsidian vlc
-  obs-studio element-desktop postman alacritty tabbed yakuake tilix
-  (callPackage ./pkgs/bluejeans { })
-  (callPackage ./pkgs/marvin.nix { })
-  (callPackage ./pkgs/stremio.nix { })
-  (callPackage ./pkgs/toptracker { })
-  (callPackage ./pkgs/roamresearch { })
-  (callPackage ./pkgs/pageres { })
-  (callPackage ./pkgs/ipfs-desktop { })
-#+end_src
-
-*** Steam
-
-Whitelist unfree packages
-
-#+begin_src nix :noweb-ref unfree-packages
-  "steam" "steam-original" "steam-runtime"
-#+end_src
-
-Install steam
-
-#+begin_src nix :noweb-ref system-configuration
-  programs.steam.enable = true;
-#+end_src
-
-**** COMMENT fix "X Error of failed request: BadMatch (invalid parameter attributes)"
-
-#+begin_src nix :noweb-ref system-configuration
-environment.variables = {
-  # to fix "X Error of failed request: BadMatch (invalid parameter attributes)"
-  __GLVND_DISALLOW_PATCHING = "1";
-};
-#+end_src
-
-
-** Urxvt
-
-#+begin_src nix :noweb-ref home-configuration
-programs.urxvt = {
-  enable = true;
-  package = pkgs.rxvt-unicode-emoji;
-  fonts = [ "xft:Droid Sans Mono Nerd Font:size=9" ];
-};
-#+end_src
-
 ** GDM
 
 #+begin_src nix :noweb-ref system-configuration
   services.xserver.displayManager.gdm.enable = true;
   services.xserver.displayManager.gdm.wayland = false;
 #+end_src
-
-
-** LightDM
 
 ** Gnome
 
@@ -544,7 +392,7 @@ DConf settings
   "ca/desrt/dconf-editor" = { show-warning = false; };
 #+end_src
 
-*** Keybindings
+*** Hotkeys
 
 Install run-or-raise
 
@@ -611,8 +459,8 @@ services.xserver.modules = [ pkgs.xf86_input_wacom ];
 services.xserver.wacom.enable = true;
 #+end_src
 
-
-** XMonad
+** COMMENT LightDM
+** COMMENT XMonad
 
 #+begin_src nix :noweb-ref system-configuration
 services.xserver.windowManager.xmonad = {
@@ -621,24 +469,61 @@ services.xserver.windowManager.xmonad = {
 };
 #+end_src
 
-*** Install DWM
+** Sound
+
+#+begin_src nix
+  sound.enable = true;
+#+end_src
+
+*** PulseAudio
+
+#+begin_src nix
+hardware.pulseaudio.enable = true;
+#+end_src
+
+**** Bluetooth support for PulseAudio
+
+#+begin_src nix
+hardware.pulseaudio.package = pkgs.pulseaudioFull;
+hardware.pulseaudio.extraConfig = "
+  load-module module-switch-on-connect
+";
+#+end_src
+
+*** COMMENT Bluetooth audio
+
+#+begin_src nix
+  hardware.bluetooth.settings = {
+    General = {
+        # Disable = "Headset";
+        # Enable = "Source,Sink,Headet,Media,Socket";
+        # Disable = "Socket";
+        # MultiProfile = "multiple";
+    };
+  };
+#+end_src
+
+*** COMMENT Blueman
+
+#+begin_src nix
+  services.blueman.enable = true;
+#+end_src
+
+** Bluetooth
+
+#+begin_src nix
+hardware.bluetooth.enable = true;
+#+end_src
+
+*** DWM
 
 #+begin_src nix :noweb-ref system-configuration
 services.xserver.windowManager.dwm.enable = true;
 #+end_src
 
-** COMMENT Emacs (home-manager)
-#+begin_src nix :noweb-ref home-configuration
-# programs.emacs = {
-#   enable = true;
-# };
-services.emacs = {
-  enable = true;
-  client.enable = true;
-  defaultEditor = true;
-};
-#+end_src
-** Emacs (system)
+* Apps
+** Editor
+*** Emacs (system)
 
 #+begin_src nix :noweb-ref system-configuration
 services.emacs = {
@@ -646,7 +531,7 @@ services.emacs = {
 };
 #+end_src
 
-*** Overlay
+**** COMMENT Overlay
 
 #+begin_src nix :noweb-ref system-configuration
   services.emacs.package = pkgs.emacsUnstable.pkgs.withPackages (epkgs: [ epkgs.vterm ]);
@@ -659,14 +544,13 @@ services.emacs = {
 }))
 #+end_src
 
-*** COMMENT VTerm
+**** COMMENT VTerm
 
 #+begin_src nix :noweb-ref system-configuration
   services.emacs.package = with pkgs; (emacs.pkgs.withPackages (epkgs: [ epkgs.vterm ]));
 #+end_src
 
-
-** COMMENT Emacs (overlay)
+**** COMMENT Emacs (overlay)
 
 #+begin_src nix :noweb-ref system-configuration
   services.emacs.package = with pkgs; (emacsPgtkGcc.emacsWithPackages (epkgs: [ epkgs.vterm ]));
@@ -684,16 +568,31 @@ services.emacs = {
     }))
 #+end_src
 
-** COMMENT Firefox (system)
+**** COMMENT Emacs (home-manager)
+#+begin_src nix :noweb-ref home-configuration
+# programs.emacs = {
+#   enable = true;
+# };
+services.emacs = {
+  enable = true;
+  client.enable = true;
+  defaultEditor = true;
+};
+#+end_src
 
-
-** Firefox
+*** vim
+**** Default editor
+#+begin_src nix :noweb-ref system-configuration
+programs.vim.defaultEditor = true;
+#+end_src
+** Browser
+*** Firefox
 
 #+begin_src nix :noweb-ref home-configuration
 programs.firefox.enable = true;
 #+end_src
 
-*** Nightly
+**** Nightly
 
 #+begin_src nix :noweb-ref overlays
 (import (builtins.fetchTarball https://github.com/mozilla/nixpkgs-mozilla/archive/master.tar.gz))
@@ -703,7 +602,7 @@ programs.firefox.enable = true;
 programs.firefox.package = pkgs.latest.firefox-nightly-bin.unwrapped;
 #+end_src
 
-*** COMMENT Native extensions
+**** COMMENT Native extensions
 #
 #+begin_src nix :noweb-ref home-configuration
   programs.firefox.package = pkgs.firefox-unwrapped.override {
@@ -717,7 +616,7 @@ programs.firefox.package = pkgs.latest.firefox-nightly-bin.unwrapped;
   };
 #+end_src
 
-*** Addons
+**** Addons
 
 #+begin_src nix :noweb-ref system-configuration
 nixpkgs.config.packageOverrides = pkgs: {
@@ -734,7 +633,7 @@ nixpkgs.config.packageOverrides = pkgs: {
   ];
 #+end_src
 
-*** COMMENT Gestures
+**** COMMENT Gestures
 
 Make firefox use xinput2 for improved touchscreen support
 
@@ -744,61 +643,42 @@ Make firefox use xinput2 for improved touchscreen support
   };
 #+end_src
 
-** X11 utils
+**** COMMENT Firefox (system)
+
+** Passwords
+*** GNU Pass
+#+begin_src nix :noweb-ref home-packages
+pass
+#+end_src
+** COMMENT Personal finance
+*** Ledger
 
 #+begin_src nix :noweb-ref home-packages
-  wl-clipboard wmctrl xdotool xorg.xprop xorg.xwininfo
+ledger
 #+end_src
-
-** Fonts
-
-#+begin_src nix :noweb-ref system-configuration
-  fonts = {
-    enableDefaultFonts = false;
-    fonts = with pkgs; [
-      noto-fonts
-      noto-fonts-cjk
-      noto-fonts-emoji
-      twitter-color-emoji
-      liberation_ttf
-      fira-code
-      fira-code-symbols
-      # mplus-outline-fonts
-      dina-font
-      proggyfonts
-      source-code-pro
-      gentium
-      (nerdfonts.override { fonts = [ "FiraCode" "DroidSansMono" ]; })
-    ];
-  };
-#+end_src
-* CLI, Terminal
-
-
-Console / terminal / headless packages
-
-#+begin_src nix :noweb-ref home-packages
-  awscli2 cmake git gnupg hub imagemagick jq ledger libtool  pass unzip pandoc  nixfmt
-  (callPackage ./pkgs/htmlq { })
-    nodePackages."prettier"
-#+end_src
-
 ** Shell
-
-Configure shell as I like it.
-
-#+begin_src nix :noweb-ref system-configuration
-# Use fish as default shell
-# users.users.mpontus.shell = pkgs.fish;
-
-# Use vim as default editor
-programs.vim.defaultEditor = true;
+*** bash
+#+begin_src nix :noweb-ref home-configuration
+  programs.bash = {
+    enable = true;
+    historySize = 100000;
+    historyFileSize = 100000;
+    historyControl = ["ignoredups" "erasedups"];
+    initExtra = ''
+        export PROMPT_COMMAND="history -a; history -c; history -r; $PROMPT_COMMAND"
+    '';
+    enableVteIntegration = true;
+  };
 #+end_src
 
 *** fish
-
 #+begin_src nix :noweb-ref system-configuration
 programs.fish.enable = true;
+#+end_src
+
+**** COMMENT Default shell
+#+begin_src nix :noweb-ref system-configuration
+users.users.mpontus.shell = pkgs.fish;
 #+end_src
 
 **** COMMENT Home-manager
@@ -869,47 +749,156 @@ Source: https://github.com/fish-shell/fish-shell/issues/825#issuecomment-4402860
   '';
 }
 #+end_src
-*** bash
+** Terminal
+*** Tilix (dropdown terminal emulator)
+
+#+begin_src nix :noweb-ref home-packages
+tilix
+#+end_src
+
+*** COMMENT Urxvt
+
 #+begin_src nix :noweb-ref home-configuration
-  programs.bash = {
-    enable = true;
-    historySize = 100000;
-    historyFileSize = 100000;
-    historyControl = ["ignoredups" "erasedups"];
-    initExtra = ''
-        export PROMPT_COMMAND="history -a; history -c; history -r; $PROMPT_COMMAND"
-    '';
-    enableVteIntegration = true;
-  };
+programs.urxvt = {
+  enable = true;
+  package = pkgs.rxvt-unicode-emoji;
+  fonts = [ "xft:Droid Sans Mono Nerd Font:size=9" ];
+};
+#+end_src
+** Productivity
+*** COMMENT Obsidian
+
+#+begin_src nix :noweb-ref home-packages
+obsidian
 #+end_src
 
-*** sudo
+*** COMMENT Roam Research
 
-Increase sudo password timeout
-
-#+begin_src nix :noweb-ref system-configuration
-  security.sudo.extraConfig = ''
-    Defaults        env_reset,timestamp_timeout=30
-  '';
+#+begin_src nix :noweb-ref home-packages
+(callPackage ./pkgs/roamresearch { })
 #+end_src
 
+*** COMMENT Amazing Mavin
+
+#+begin_src nix :noweb-ref home-packages
+(callPackage ./pkgs/marvin.nix { })
+#+end_src
+
+*** TopTracker
+
+#+begin_src nix :noweb-ref home-packages
+(callPackage ./pkgs/toptracker { })
+#+end_src
+** Communication
+*** Slack
+
+#+begin_src nix :noweb-ref unfree-packages
+"slack"
+#+end_src
+
+#+begin_src nix :noweb-ref home-packages
+slack
+#+end_src
+
+*** Telegram
+
+#+begin_src nix :noweb-ref home-packages
+tdesktop
+#+end_src
+
+*** Element
+
+#+begin_src nix :noweb-ref home-packages
+element-desktop
+#+end_src
+
+*** Discord
+
+#+begin_src nix :noweb-ref home-packages
+discord
+#+end_src
+
+#+begin_src nix :noweb-ref unfree-packages
+"discord"
+#+end_src
+*** COMMENT Bluejeans
+
+#+begin_src nix :noweb-ref home-packages
+(callPackage ./pkgs/bluejeans { })
+#+end_src
+* System tools
 ** Monitoring
+*** htop
 
-Programs for monitoring and diagnosing the system
+Monitor active procesesses, memory and CPU usage
 
 #+begin_src nix :noweb-ref home-packages
-htop lsof
+htop
 #+end_src
 
+*** lsof
+
+List open files and sockets
+
+#+begin_src nix :noweb-ref home-packages
+lsof
+#+end_src
 ** Filesystem
+*** file
 
-Various programs for navigating the filesytem
+Determine file type
 
 #+begin_src nix :noweb-ref home-packages
-file tree ripgrep silver-searcher fd ncdu
+file
 #+end_src
 
-*** Locate
+*** tree
+
+List directory contents recursively
+
+#+begin_src nix :noweb-ref home-packages
+tree
+#+end_src
+
+*** ncdu
+
+Count file and directory sizes recursively.
+
+#+begin_src nix :noweb-ref home-packages
+ncdu
+#+end_src
+
+*** unzip
+
+Unzip files.
+
+#+begin_src nix :noweb-ref home-packages
+unzip
+#+end_src
+** Searching
+*** ag
+
+Search text in files.
+
+#+begin_src nix :noweb-ref home-packages
+silver-searcher
+#+end_src
+
+*** ripgrep
+
+#+begin_src nix :noweb-ref home-packages
+ripgrep
+#+end_src
+
+*** fd
+
+Search files by name.
+
+#+begin_src nix :noweb-ref home-packages
+fd
+#+end_src
+*** locate
+
 Use `locate` to find files globally
 
 #+begin_src nix :noweb-ref system-configuration
@@ -922,11 +911,85 @@ Use `locate` to find files globally
   };
 #+end_src
 
+** Processing
+*** jq
+
+Transform JSON files
+
+#+begin_src nix :noweb-ref home-packages
+jq
 #+end_src
 
-** gpg-agent
+*** htmlq
 
-fixme: what did I need this for?
+Transform XML/HTML files
+
+#+begin_src nix :noweb-ref home-packages
+(callPackage ./pkgs/htmlq { })
+#+end_src
+
+*** imagemagick
+
+Transform image files
+
+#+begin_src nix :noweb-ref home-packages
+imagemagick
+#+end_src
+
+** Scripting
+*** Clipboard
+
+#+begin_src nix :noweb-ref home-packages
+  wl-clipboard
+#+end_src
+
+*** WM controls
+
+#+begin_src nix :noweb-ref home-packages
+  wmctrl xdotool xorg.xprop xorg.xwininfo
+#+end_src
+
+* Development
+** VSCode
+
+#+begin_src nix :noweb-ref home-packages
+vscode
+#+end_src
+
+#+begin_src nix :noweb-ref unfree-packages
+"vscode"
+#+end_src
+
+** COMMENT Direnv
+** Git
+
+#+begin_src nix :noweb-ref system-packages
+git
+#+end_src
+
+*** COMMENT Git LFS
+
+Large File Storage
+
+#+begin_src nix :noweb-ref system-packages
+git-lfs
+#+end_src
+
+*** GitHub CLI
+
+#+begin_src nix :noweb-ref home-packages
+hub
+#+end_src
+
+** GPG
+
+#+begin_src nix :noweb-ref home-packages
+  gnupg
+#+end_src
+
+*** gpg-agent
+
+???
 
 #+begin_src nix :noweb-ref home-configuration
   services.gpg-agent = {
@@ -936,7 +999,110 @@ fixme: what did I need this for?
   };
 #+end_src
 
-* Games
+** IPFS
+*** /etc/hosts
+
+#+begin_src nix :noweb-ref system-configuration
+networking.extraHosts = ''
+  127.0.0.1 ipfs.local
+'';
+#+end_src
+
+** Docker
+
+#+begin_src nix
+  virtualisation.docker.enable = true;
+#+end_src
+
+*** Add user to docker group
+
+#+begin_src nix :noweb-ref system-configuration
+  users.extraGroups.docker.members = ["mpontus"];
+#+end_src
+
+*** Mitigate hangs on system shutdown
+
+See https://discourse.nixos.org/t/docker-hanging-on-reboot/18270
+
+#+begin_src nix :noweb-ref system-configuration
+virtualisation.docker.liveRestore = false;
+#+end_src
+** COMMENT Virtualbox
+
+#+begin_src nix :noweb-ref nonfree-packages
+  "Oracle_VM_VirtualBox_Extension_Pack"
+#+end_src
+
+#+begin_src nix :noweb-ref system-configuration
+  virtualisation.virtualbox.host.enable = true;
+  virtualisation.virtualbox.host.enableExtensionPack = true;
+  users.extraGroups.vboxusers.members = ["mpontus"];
+#+end_src
+
+** awscli
+
+#+begin_src nix :noweb-ref home-packages
+awscli2
+#+end_src
+
+** prettier
+
+Format code using prettier
+
+#+begin_src nix :noweb-ref home-packages
+nodePackages."prettier"
+#+end_src
+
+** nixfmt
+
+Format Nix files
+
+#+begin_src nix :noweb-ref home-packages
+nixfmt
+#+end_src
+
+* COMMENT Entertainment
+** Deluge
+
+#+begin_src nix :noweb-ref home-packages
+deluge
+#+end_src
+
+** VLC
+
+#+begin_src nix :noweb-ref home-packages
+vlc
+#+end_src
+
+** OBS
+
+#+begin_src nix :noweb-ref home-packages
+obs-studio
+#+end_src
+
+** Steam
+
+Whitelist unfree packages
+
+#+begin_src nix :noweb-ref unfree-packages
+  "steam" "steam-original" "steam-runtime"
+#+end_src
+
+Install steam
+
+#+begin_src nix :noweb-ref system-configuration
+  programs.steam.enable = true;
+#+end_src
+
+*** COMMENT fix "X Error of failed request: BadMatch (invalid parameter attributes)"
+
+#+begin_src nix :noweb-ref system-configuration
+environment.variables = {
+  # to fix "X Error of failed request: BadMatch (invalid parameter attributes)"
+  __GLVND_DISALLOW_PATCHING = "1";
+};
+#+end_src
+
 ** StarSector
 
 #+begin_src nix :noweb-ref system-packages
@@ -997,6 +1163,3 @@ Superweapons mod is distributed as a rar archive.
   });
 })
 #+end_src
-
-* Direnv
-
