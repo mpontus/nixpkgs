@@ -1057,7 +1057,7 @@ Format Nix files
 nixfmt
 #+end_src
 
-* COMMENT Entertainment
+* Entertainment
 ** Stremio
 
 #+begin_src nix :noweb-ref home-packages
@@ -1113,7 +1113,7 @@ environment.variables = {
 };
 #+end_src
 
-** StarSector
+** COMMENT StarSector
 
 #+begin_src nix :noweb-ref system-packages
 starsector                      #
