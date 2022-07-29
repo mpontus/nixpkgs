@@ -220,7 +220,7 @@ services.openvpn.servers.pia = {
     url = "https://www.privateinternetaccess.com/openvpn/openvpn.zip";
     sha256 = "0vxm18gzn7fi7dd85rmj3hnbral568bgczhvgi8cb348lx5i23v4";
     stripRoot = false   ;
-  }}/netherlands.ovpn";
+  }}/belgium.ovpn";
 };
 #+end_src
 
