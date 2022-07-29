@@ -1058,6 +1058,12 @@ nixfmt
 #+end_src
 
 * COMMENT Entertainment
+** Stremio
+
+#+begin_src nix :noweb-ref home-packages
+(callPackage ./pkgs/stremio.nix { })
+#+end_src
+
 ** Deluge
 
 #+begin_src nix :noweb-ref home-packages
