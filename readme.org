@@ -590,7 +590,7 @@ programs.vim.defaultEditor = true;
 programs.firefox.enable = true;
 #+end_src
 
-**** Nightly
+**** COMMENT Nightly
 
 #+begin_src nix :noweb-ref overlays
 (import (builtins.fetchTarball https://github.com/mozilla/nixpkgs-mozilla/archive/master.tar.gz))
