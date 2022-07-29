@@ -1071,6 +1071,14 @@ vlc
 #+end_src
 
 ** OBS
+** Calibre
+
+GTK+ book reader
+
+#+begin_src nix :noweb-ref home-packages
+calibre
+#+end_src
+
 
 #+begin_src nix :noweb-ref home-packages
 obs-studio
