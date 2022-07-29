@@ -823,7 +823,7 @@ discord
 (callPackage ./pkgs/bluejeans { })
 #+end_src
 * System tools
-** Monitoring
+** Diagnostics
 *** htop
 
 Monitor active procesesses, memory and CPU usage
@@ -839,6 +839,14 @@ List open files and sockets
 #+begin_src nix :noweb-ref home-packages
 lsof
 #+end_src
+*** inetutils
+
+Traceroute...
+
+#+begin_src nix :noweb-ref home-packages
+inetutils
+#+end_src
+
 ** Filesystem
 *** file
 
