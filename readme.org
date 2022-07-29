@@ -76,6 +76,7 @@ Configure home environment
 
     <<home-configuration>>
 
+    home.stateVersion = "18.09";
   };
 #+end_src
 
@@ -104,15 +105,8 @@ Give root user git
 #+begin_src nix :noweb-ref system-configuration
   home-manager.users.root = { pkgs, ... }: {
     home.packages = with pkgs; [ htop git ];
+    home.stateVersion = "18.09";
   };
-#+end_src
-
-*** COMMENT Unfree packages?
-
-#+begin_src nix :noweb-ref home-configuration
-  nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (pkgs.lib.getName pkg) [
-    <<unfree-packages>>
-  ];
 #+end_src
 
 ** Store optimization
@@ -125,12 +119,6 @@ nix.settings.auto-optimise-store = true;
 
 #+begin_src nix :noweb-ref system-configuration
 nix.package = pkgs.nixUnstable;
-#+end_src
-
-** TODO COMMENT Figure out what's pulling nodejs-12
-
-#+begin_src nix :noweb-ref insecure-packages
-"nodejs-12.22.12"
 #+end_src
 
 * System
