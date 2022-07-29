@@ -486,6 +486,18 @@ hardware.pulseaudio.extraConfig = "
 ";
 #+end_src
 
+** Bluetooth
+
+#+begin_src nix
+hardware.bluetooth.enable = true;
+#+end_src
+
+*** COMMENT Blueman
+
+#+begin_src nix
+  services.blueman.enable = true;
+#+end_src
+
 *** COMMENT Bluetooth audio
 
 #+begin_src nix
@@ -497,24 +509,6 @@ hardware.pulseaudio.extraConfig = "
         # MultiProfile = "multiple";
     };
   };
-#+end_src
-
-*** COMMENT Blueman
-
-#+begin_src nix
-  services.blueman.enable = true;
-#+end_src
-
-** Bluetooth
-
-#+begin_src nix
-hardware.bluetooth.enable = true;
-#+end_src
-
-*** DWM
-
-#+begin_src nix :noweb-ref system-configuration
-services.xserver.windowManager.dwm.enable = true;
 #+end_src
 
 * Apps
