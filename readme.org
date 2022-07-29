@@ -195,6 +195,8 @@ Don't forget to reset a password with ‘passwd’
 
 *** DHCP
 
+Disable DHCP by default to run NixOS in a VM.
+
 #+begin_src nix
   networking.useDHCP = false;
   networking.interfaces.wlp2s0.useDHCP = true;
