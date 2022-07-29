@@ -412,8 +412,16 @@ Configure gnome keybindings
     command = "run-or-raise 'class = \"TelegramDesktop\"' telegram-desktop";
   };
   "<Super>c" = {
-    name = "Switch to Console";
-    command = "run-or-raise 'class = \"Gnome-shell\"' gnome-terminal";
+    name = "Tilix";
+    command = "launch-or-raise -W tilix tilix";
+  };
+  "<Super><Return>" = {
+    name = "Tilix (dropdown)";
+    command = "tilix --quake";
+  };
+  "<Shift><Super>c" = {
+    name = "Tilix (preferences)";
+    command = "tilix --preferences";
   };
   "<Super>s" = {
     name = "Switch to Slack";
