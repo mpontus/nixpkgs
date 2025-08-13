@@ -36,7 +36,7 @@ buildPythonPackage {
     repo = "crewAI-tools";
     # Note: There are no tagged releases yet so we just use the latest revision
     rev = "03f77f0"; # "refs/tags/${version}";
-    hash = "sha256-sxb6nBVoTTOAOs11uwDbtgH9cJ7yc7gwqxhoftgdVMU=";
+    hash = "sha256-2oK5Ds/ws1Wz+SN8BZ3vnpTXzNHq/0ee2S46fHwVSRw=";
   };
 
   dependencies = [
